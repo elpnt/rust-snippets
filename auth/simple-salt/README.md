@@ -10,7 +10,7 @@ tide::log Logger started
 tide::server Server listening on http://127.0.0.1:8080
 ```
 
-**Client
+**Client**
 
 ```sh
 # Registration

@@ -1,0 +1,13 @@
+version: '3'
+services:
+  postgres:
+    image: postgres:13-alpine
+    container_name: pg-container
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=actix-sqlx-todo
+      - DATABASE_HOST=localhost
+    restart: always

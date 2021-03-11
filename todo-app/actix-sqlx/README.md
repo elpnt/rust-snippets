@@ -14,7 +14,7 @@ Simple todo web app built with actix and sqlx
 > edit migrations/<timestamp>_todo.sql
 ```
 
-```postgresql
+```sql
 -- <timestamp>_todo.sql
 CREATE TABLE IF NOT EXISTS todo (
     id          SERIAL  PRIMARY KEY,

@@ -2,8 +2,7 @@ use actix_web::{Error, HttpRequest, HttpResponse, Responder};
 use anyhow::Result;
 use futures::future::{ready, Ready};
 use serde::{Deserialize, Serialize};
-use sqlx::postgres::PgRow;
-use sqlx::{Done, FromRow, PgPool, Row};
+use sqlx::{Done, FromRow, PgPool};
 
 #[derive(Serialize, Deserialize)]
 pub struct TodoRequest {
@@ -74,48 +73,46 @@ impl Todo {
 
     pub async fn create(todo: TodoRequest, pool: &PgPool) -> Result<Todo> {
         let mut tx = pool.begin().await?;
-        let todo = sqlx::query(
+        let rec = sqlx::query!(
             "
                 INSERT INTO todo (description, done)
                 VALUES ($1, $2)
                 RETURNING id, description, done
             ",
+            &todo.description,
+            todo.done
         )
-        .bind(&todo.description)
-        .bind(todo.done)
-        .map(|row: PgRow| Todo {
-            id: row.get(0),
-            description: row.get(1),
-            done: row.get(2),
-        })
         .fetch_one(&mut tx)
         .await?;
 
         tx.commit().await?;
-        Ok(todo)
+        Ok(Todo {
+            id: rec.id,
+            description: rec.description,
+            done: rec.done,
+        })
     }
 
     pub async fn update(id: i32, todo: TodoRequest, pool: &PgPool) -> Result<Todo> {
         let mut tx = pool.begin().await?;
-        let todo = sqlx::query(
+        let rec = sqlx::query!(
             "UPDATE todo
                 SET description=$1, done=$2
               WHERE id=$3
              RETURNING id, description, done",
+            &todo.description,
+            todo.done,
+            id
         )
-        .bind(&todo.description)
-        .bind(todo.done)
-        .bind(id)
-        .map(|row: PgRow| Todo {
-            id: row.get(0),
-            description: row.get(1),
-            done: row.get(2),
-        })
         .fetch_one(&mut tx)
         .await?;
 
         tx.commit().await?;
-        Ok(todo)
+        Ok(Todo {
+            id: rec.id,
+            description: rec.description,
+            done: rec.done,
+        })
     }
 
     pub async fn delete(id: i32, pool: &PgPool) -> Result<u64> {

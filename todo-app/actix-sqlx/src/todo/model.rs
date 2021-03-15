@@ -2,7 +2,7 @@ use actix_web::{Error, HttpRequest, HttpResponse, Responder};
 use anyhow::Result;
 use futures::future::{ready, Ready};
 use serde::{Deserialize, Serialize};
-use sqlx::{Done, FromRow, PgPool};
+use sqlx::{FromRow, PgPool};
 
 #[derive(Serialize, Deserialize)]
 pub struct TodoRequest {
@@ -31,30 +31,22 @@ impl Responder for Todo {
 
 impl Todo {
     pub async fn find_all(pool: &PgPool) -> Result<Vec<Todo>> {
-        let mut todos = vec![];
-        let recs = sqlx::query!(
+        let todos: Vec<Todo> = sqlx::query_as!(
+            Todo,
             r#"
-                SELECT id, description, done
-                  FROM todo
+                SELECT * FROM todo
                  ORDER BY ID
             "#
         )
         .fetch_all(pool)
         .await?;
 
-        for rec in recs {
-            todos.push(Todo {
-                id: rec.id,
-                description: rec.description,
-                done: rec.done,
-            });
-        }
-
         Ok(todos)
     }
 
     pub async fn find_by_id(id: i32, pool: &PgPool) -> Result<Todo> {
-        let rec = sqlx::query!(
+        let rec = sqlx::query_as!(
+            Todo,
             r#"
                 SELECT * FROM todo
                  WHERE id = $1
@@ -63,22 +55,18 @@ impl Todo {
         )
         .fetch_one(pool)
         .await?;
-
-        Ok(Todo {
-            id: rec.id,
-            description: rec.description,
-            done: rec.done,
-        })
+        Ok(rec)
     }
 
     pub async fn create(todo: TodoRequest, pool: &PgPool) -> Result<Todo> {
         let mut tx = pool.begin().await?;
-        let rec = sqlx::query!(
-            "
+        let todo = sqlx::query_as!(
+            Todo,
+            r#"
                 INSERT INTO todo (description, done)
                 VALUES ($1, $2)
                 RETURNING id, description, done
-            ",
+            "#,
             &todo.description,
             todo.done
         )
@@ -86,42 +74,44 @@ impl Todo {
         .await?;
 
         tx.commit().await?;
-        Ok(Todo {
-            id: rec.id,
-            description: rec.description,
-            done: rec.done,
-        })
+        Ok(todo)
     }
 
-    pub async fn update(id: i32, todo: TodoRequest, pool: &PgPool) -> Result<Todo> {
+    pub async fn update(id: i32, req: TodoRequest, pool: &PgPool) -> Result<Todo> {
         let mut tx = pool.begin().await?;
-        let rec = sqlx::query!(
-            "UPDATE todo
-                SET description=$1, done=$2
-              WHERE id=$3
-             RETURNING id, description, done",
-            &todo.description,
-            todo.done,
+        let todo = sqlx::query_as!(
+            Todo,
+            r#"
+                UPDATE todo
+                   SET description=$1, done=$2
+                 WHERE id=$3
+                RETURNING id, description, done
+            "#,
+            &req.description,
+            req.done,
             id
         )
         .fetch_one(&mut tx)
         .await?;
 
         tx.commit().await?;
-        Ok(Todo {
-            id: rec.id,
-            description: rec.description,
-            done: rec.done,
-        })
+        Ok(todo)
     }
 
-    pub async fn delete(id: i32, pool: &PgPool) -> Result<u64> {
+    pub async fn delete(id: i32, pool: &PgPool) -> Result<Todo> {
         let mut tx = pool.begin().await?;
-        let deleted = sqlx::query("DELETE FROM todo WHERE id=$1")
-            .bind(id)
-            .execute(&mut tx)
-            .await?;
+        let deleted = sqlx::query_as!(
+            Todo,
+            r#"
+                DELETE FROM todo
+                 WHERE id=$1
+                RETURNING *
+            "#,
+            id
+        )
+        .fetch_one(&mut tx)
+        .await?;
         tx.commit().await?;
-        Ok(deleted.rows_affected())
+        Ok(deleted)
     }
 }

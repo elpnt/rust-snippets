@@ -46,13 +46,7 @@ async fn update(
 async fn delete(id: web::Path<i32>, db_pool: web::Data<PgPool>) -> impl Responder {
     let result = Todo::delete(id.into_inner(), db_pool.get_ref()).await;
     match result {
-        Ok(rows) => {
-            if rows > 0 {
-                HttpResponse::Ok().body(format!("Successfully deleted {} record(s)", rows))
-            } else {
-                HttpResponse::BadRequest().body("Todo not found")
-            }
-        }
+        Ok(todo) => HttpResponse::Ok().json(todo),
         _ => HttpResponse::BadRequest().body("Todo not found"),
     }
 }
